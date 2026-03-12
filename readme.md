@@ -10,4 +10,5 @@
 
 现在只支持macOS
 
-python 我用的是macOS自带的 3.9
+python 我用的是macOS自带的 3.9  或者使用 3.12 版本，3.9 aws 的库有个警告。
+
