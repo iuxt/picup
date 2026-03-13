@@ -12,3 +12,11 @@
 
 python 我用的是macOS自带的 3.9  或者使用 3.12 版本，3.9 aws 的库有个警告。
 
+
+```bash
+cp picup.plist ~/Library/LaunchAgents/picup.plist
+launchctl load ~/Library/LaunchAgents/picup.plist
+launchctl start picup
+launchctl stop picup
+launchctl unload ~/Library/LaunchAgents/picup.plist
+```
