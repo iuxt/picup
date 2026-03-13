@@ -15,8 +15,8 @@
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/iuxt/code/picup/stdout.log</string>
+    <string>/Users/iuxt/code/picup/logs/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/iuxt/code/picup/stderr.log</string>
+    <string>/Users/iuxt/code/picup/logs/stderr.log</string>
 </dict>
 </plist>
