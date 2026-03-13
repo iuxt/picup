@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from PIL import Image, ImageDraw, ImageFont
 import boto3
 from botocore.exceptions import NoCredentialsError
+from botocore.config import Config
 import subprocess
 from dotenv import load_dotenv
 
@@ -23,6 +24,7 @@ S3_ENDPOINT = os.getenv('S3_ENDPOINT_URL', None)
 WATERMARK_TEXT = os.getenv('WATERMARK_TEXT', 'PicUp')
 WATERMARK_POSITION = os.getenv('WATERMARK_POSITION', 'bottom_right')
 WATERMARK_COLOR = os.getenv('WATERMARK_COLOR', '#FFFFFF')
+
 
 def get_clipboard_image():
     """获取剪贴板中的图片"""
@@ -65,6 +67,7 @@ def get_clipboard_image():
     except Exception as e:
         print(f"获取剪贴板图片失败: {e}")
         return None
+
 
 def add_watermark(image):
     """为图片添加水印"""
@@ -117,6 +120,7 @@ def add_watermark(image):
         print(f"添加水印失败: {e}")
         return image
 
+
 def upload_to_s3(image, filename):
     """上传图片到 S3"""
     try:
@@ -125,13 +129,17 @@ def upload_to_s3(image, filename):
             print("S3 配置不完整")
             return None
         
+        # 配置不走代理
+        no_proxy = Config(proxies={})
+
         # 初始化 S3 客户端
         s3 = boto3.client(
             's3',
             region_name=S3_REGION,
             endpoint_url=S3_ENDPOINT,
             aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            config=no_proxy
         )
         
         # 将图片转换为字节流
@@ -171,6 +179,7 @@ def upload_to_s3(image, filename):
         print(f"上传到 S3 失败: {e}")
         return None
 
+
 def copy_to_clipboard(text):
     """将文本复制到剪贴板"""
     try:
@@ -179,6 +188,7 @@ def copy_to_clipboard(text):
     except Exception as e:
         print(f"复制到剪贴板失败: {e}")
         return False
+
 
 def show_notification(title, message):
     """显示 macOS 通知"""
@@ -189,6 +199,7 @@ def show_notification(title, message):
     except Exception as e:
         print(f"显示通知失败: {e}")
         return False
+
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -220,10 +231,12 @@ def upload():
         print(f"上传过程中出错: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
 @app.route('/health', methods=['GET'])
 def health():
     """健康检查端点"""
     return jsonify({'status': 'ok'})
+
 
 if __name__ == '__main__':
     app.run(debug=False, host='127.0.0.1', port=36677)
