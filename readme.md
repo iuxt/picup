@@ -12,6 +12,28 @@
 
 python 我用的是macOS自带的 3.9  或者使用 3.12 版本，3.9 aws 的库有个警告。
 
+安装依赖：
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+本地启动：
+
+```bash
+./picup
+```
+
+服务会用 Waitress 启动，不再使用 Flask 开发服务器。默认监听 `127.0.0.1:36677`，可以在 `.env` 里修改：
+
+```env
+PICUP_HOST=127.0.0.1
+PICUP_PORT=36677
+PICUP_THREADS=4
+```
+
+设置为 macOS 开机自启动：
 
 ```bash
 cp picup.plist ~/Library/LaunchAgents/picup.plist

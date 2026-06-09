@@ -1,7 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
-source .venv/bin/activate
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python -u app.py
+exec "$APP_DIR/.venv/bin/python" -u "$APP_DIR/server.py"
