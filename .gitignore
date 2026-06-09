@@ -2,4 +2,8 @@
 .venv/
 .DS_Store
 logs/*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
