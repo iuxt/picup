@@ -33,12 +33,13 @@ PICUP_PORT=36677
 PICUP_THREADS=4
 ```
 
-设置为 macOS 开机自启动：
+注册到系统，并设置为 macOS 开机自启动：
 
 ```bash
-cp picup.plist ~/Library/LaunchAgents/picup.plist
-launchctl load ~/Library/LaunchAgents/picup.plist
-launchctl start picup
-launchctl stop picup
-launchctl unload ~/Library/LaunchAgents/picup.plist
+./install.sh
+```
+
+取消 macOS 开机自启动，并取消注册。
+```bash
+./uninstall.sh
 ```
