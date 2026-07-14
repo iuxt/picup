@@ -1,5 +1,6 @@
-import os
 import io
+import logging
+import os
 import time
 import uuid
 from flask import Flask, request, jsonify
@@ -10,8 +11,12 @@ from botocore.config import Config
 import subprocess
 from dotenv import load_dotenv
 
+from logging_config import configure_logging
+
 # 加载环境变量
 load_dotenv()
+configure_logging()
+logger = logging.getLogger("picup.app")
 
 app = Flask(__name__)
 
@@ -123,10 +128,11 @@ def add_watermark(image):
 
 def upload_to_s3(image, filename):
     """上传图片到 S3"""
+    unique_filename = None
     try:
         # 检查必要的配置
         if not S3_BUCKET or not S3_REGION:
-            print("S3 配置不完整")
+            logger.error("上传失败 | object_key=- | error=S3 配置不完整")
             return None
         
         # 配置不走代理
@@ -154,15 +160,25 @@ def upload_to_s3(image, filename):
         
         # 生成带年月前缀的唯一文件名
         unique_filename = f"{year_month}/{int(time.time())}_{uuid.uuid4().hex}_{filename}"
-        
+
         # 上传到 S3
+        logger.info("开始上传 | object_key=%s", unique_filename)
+        started_at = time.perf_counter()
+
         s3.upload_fileobj(
             img_byte_arr,
             S3_BUCKET,
             unique_filename,
             ExtraArgs={'ContentType': 'image/png'}
         )
-        
+
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        logger.info(
+            "上传成功 | object_key=%s | duration_ms=%.0f",
+            unique_filename,
+            duration_ms,
+        )
+
         # 生成 URL
         if S3_ENDPOINT:
             # 自定义 S3 兼容存储
@@ -173,10 +189,17 @@ def upload_to_s3(image, filename):
         
         return url
     except NoCredentialsError:
-        print("S3 凭证错误")
+        logger.error(
+            "上传失败 | object_key=%s | error=S3 凭证错误",
+            unique_filename or "-",
+        )
         return None
     except Exception as e:
-        print(f"上传到 S3 失败: {e}")
+        logger.exception(
+            "上传失败 | object_key=%s | error=%s",
+            unique_filename or "-",
+            e,
+        )
         return None
 
 
