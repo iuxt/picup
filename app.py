@@ -70,7 +70,7 @@ def get_clipboard_image():
         # 如果没有找到图片数据
         return None
     except Exception as e:
-        print(f"获取剪贴板图片失败: {e}")
+        logger.exception("获取剪贴板图片失败 | error=%s", e)
         return None
 
 
@@ -122,7 +122,7 @@ def add_watermark(image):
         
         return image
     except Exception as e:
-        print(f"添加水印失败: {e}")
+        logger.exception("添加水印失败 | error=%s", e)
         return image
 
 
@@ -209,7 +209,7 @@ def copy_to_clipboard(text):
         subprocess.run(['pbcopy'], input=text.encode('utf-8'), check=True)
         return True
     except Exception as e:
-        print(f"复制到剪贴板失败: {e}")
+        logger.exception("复制到剪贴板失败 | error=%s", e)
         return False
 
 
@@ -220,7 +220,7 @@ def show_notification(title, message):
         subprocess.run(['osascript', '-e', script], check=True)
         return True
     except Exception as e:
-        print(f"显示通知失败: {e}")
+        logger.exception("显示通知失败 | error=%s", e)
         return False
 
 
@@ -231,7 +231,7 @@ def upload():
         # 获取剪贴板图片
         image = get_clipboard_image()
         if not image:
-            print("剪贴板中没有图片")
+            logger.warning("剪贴板中没有图片")
             return jsonify({'success': False, 'message': '剪贴板中没有图片'}), 400
         
         # 添加水印
@@ -251,7 +251,7 @@ def upload():
         # 返回 PicGo 兼容的响应格式
         return jsonify({'success': True, 'result': url})
     except Exception as e:
-        print(f"上传过程中出错: {e}")
+        logger.exception("上传过程中出错 | error=%s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
