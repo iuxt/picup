@@ -5,7 +5,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from flask import Flask, request, jsonify
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import boto3
 from botocore.exceptions import NoCredentialsError
 from botocore.config import Config
@@ -104,6 +104,7 @@ def decode_clipboard_image(raw_bytes):
         image = Image.open(image_data)
         source_format = (image.format or "").upper()
         image.load()
+        image = ImageOps.exif_transpose(image)
 
     return ClipboardImage(
         image=image,

@@ -15,6 +15,18 @@ def image_bytes(image_format):
     return output.getvalue()
 
 
+def oriented_jpeg_bytes():
+    output = io.BytesIO()
+    exif = Image.Exif()
+    exif[274] = 6
+    Image.new("RGB", (3, 2), "red").save(
+        output,
+        format="JPEG",
+        exif=exif,
+    )
+    return output.getvalue()
+
+
 class ClipboardImageDecodingTest(unittest.TestCase):
     def test_webp_source_bytes_and_format_are_preserved(self):
         raw_bytes = image_bytes("WEBP")
@@ -47,6 +59,16 @@ class ClipboardImageDecodingTest(unittest.TestCase):
             app.CLIPBOARD_IMAGE_TYPES.index("public.png"),
             app.CLIPBOARD_IMAGE_TYPES.index("public.tiff"),
         )
+
+    def test_exif_orientation_is_applied_before_metadata_is_dropped(self):
+        raw_bytes = oriented_jpeg_bytes()
+
+        result = app.decode_clipboard_image(raw_bytes)
+
+        self.assertEqual(raw_bytes, result.raw_bytes)
+        self.assertEqual("JPEG", result.source_format)
+        self.assertEqual((2, 3), result.image.size)
+        self.assertNotIn(274, result.image.getexif())
 
 
 if __name__ == "__main__":
