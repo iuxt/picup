@@ -3,15 +3,21 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from PIL import Image
-
 import app
 
 
 class UploadLoggingTest(unittest.TestCase):
-    def test_success_logs_start_and_completion_with_same_object_key(self):
+    def make_payload(self):
+        return app.UploadPayload(
+            data=b"webp-payload",
+            filename="clipboard.webp",
+            content_type="image/webp",
+            processing="encoded",
+        )
+
+    def test_success_uploads_bytes_and_logs_same_object_key(self):
         s3_client = Mock()
-        image = Image.new("RGB", (2, 2), "white")
+        payload = self.make_payload()
 
         with (
             patch.multiple(
@@ -30,12 +36,19 @@ class UploadLoggingTest(unittest.TestCase):
             ),
             self.assertLogs("picup.app", level="INFO") as captured,
         ):
-            result = app.upload_to_s3(image, "clipboard.png")
+            result = app.upload_to_s3(payload)
 
-        object_key = s3_client.upload_fileobj.call_args.args[2]
+        upload_call = s3_client.upload_fileobj.call_args
+        uploaded_stream, bucket, object_key = upload_call.args
+        self.assertEqual(b"webp-payload", uploaded_stream.read())
+        self.assertEqual("images", bucket)
         self.assertRegex(
             object_key,
-            re.compile(r"^\d{4}/\d{2}/1720942221_abc123_clipboard\.png$"),
+            re.compile(r"^\d{4}/\d{2}/1720942221_abc123_clipboard\.webp$"),
+        )
+        self.assertEqual(
+            {"ContentType": "image/webp"},
+            upload_call.kwargs["ExtraArgs"],
         )
         self.assertEqual(
             result,
@@ -46,10 +59,10 @@ class UploadLoggingTest(unittest.TestCase):
         self.assertIn(f"上传成功 | object_key={object_key}", success_message)
         self.assertIn("duration_ms=125", success_message)
 
-    def test_failure_logs_object_key_and_reason(self):
+    def test_failure_logs_webp_object_key_and_reason(self):
         s3_client = Mock()
         s3_client.upload_fileobj.side_effect = RuntimeError("network down")
-        image = Image.new("RGB", (2, 2), "white")
+        payload = self.make_payload()
 
         with (
             patch.multiple(
@@ -68,10 +81,11 @@ class UploadLoggingTest(unittest.TestCase):
             ),
             self.assertLogs("picup.app", level="ERROR") as captured,
         ):
-            result = app.upload_to_s3(image, "clipboard.png")
+            result = app.upload_to_s3(payload)
 
         object_key = s3_client.upload_fileobj.call_args.args[2]
         self.assertIsNone(result)
+        self.assertTrue(object_key.endswith("clipboard.webp"))
         self.assertIn(f"上传失败 | object_key={object_key}", captured.output[0])
         self.assertIn("error=network down", captured.output[0])
 

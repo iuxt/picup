@@ -281,8 +281,8 @@ def prepare_upload_payload(
     )
 
 
-def upload_to_s3(image, filename):
-    """上传图片到 S3"""
+def upload_to_s3(payload):
+    """上传已经准备好的图片字节到 S3。"""
     unique_filename = None
     try:
         # 检查必要的配置
@@ -303,10 +303,7 @@ def upload_to_s3(image, filename):
             config=no_proxy
         )
         
-        # 将图片转换为字节流
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='PNG')
-        img_byte_arr.seek(0)
+        image_stream = io.BytesIO(payload.data)
         
         # 生成年月文件夹前缀
         from datetime import datetime
@@ -314,17 +311,20 @@ def upload_to_s3(image, filename):
         year_month = f"{now.year}/{now.month:02d}"
         
         # 生成带年月前缀的唯一文件名
-        unique_filename = f"{year_month}/{int(time.time())}_{uuid.uuid4().hex}_{filename}"
+        unique_filename = (
+            f"{year_month}/{int(time.time())}_{uuid.uuid4().hex}_"
+            f"{payload.filename}"
+        )
 
         # 上传到 S3
         logger.info("开始上传 | object_key=%s", unique_filename)
         started_at = time.perf_counter()
 
         s3.upload_fileobj(
-            img_byte_arr,
+            image_stream,
             S3_BUCKET,
             unique_filename,
-            ExtraArgs={'ContentType': 'image/png'}
+            ExtraArgs={'ContentType': payload.content_type}
         )
 
         duration_ms = (time.perf_counter() - started_at) * 1000
