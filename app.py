@@ -99,6 +99,30 @@ def get_clipboard_image():
         return None
 
 
+def resize_image_if_needed(image, max_dimension):
+    """Shrink an oversized image proportionally without enlarging small images."""
+    original_width, original_height = image.size
+    if max(original_width, original_height) <= max_dimension:
+        return image
+
+    resized_image = image.copy()
+    resized_image.thumbnail(
+        (max_dimension, max_dimension),
+        Image.Resampling.LANCZOS,
+    )
+    resized_width, resized_height = resized_image.size
+    logger.info(
+        "图片已缩放 | original_size=%sx%s | resized_size=%sx%s | "
+        "max_dimension=%s",
+        original_width,
+        original_height,
+        resized_width,
+        resized_height,
+        max_dimension,
+    )
+    return resized_image
+
+
 def add_watermark(image):
     """为图片添加水印"""
     try:
