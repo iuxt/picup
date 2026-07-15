@@ -32,9 +32,14 @@ PICUP_HOST=127.0.0.1
 PICUP_PORT=36677
 PICUP_THREADS=4
 MAX_IMAGE_DIMENSION=1920
+WEBP_QUALITY=82
 ```
 
 `MAX_IMAGE_DIMENSION` 是上传图片允许的最长边像素数，默认 `1920`。超过限制的图片会等比例缩小，小图不会放大。
+
+上传图片统一使用 WebP，`WEBP_QUALITY` 控制重新编码质量，默认 `82`，允许范围为 `1` 到 `100`。WebP 编码固定使用压缩方法 `6`，以较长的本地编码时间换取更小的 S3 对象。
+
+当剪贴板提供的是原始 WebP、图片不需要缩放且 `WATERMARK_TEXT` 为空时，PicUp 会直接上传原始字节，不重复编码。默认水印文字为 `PicUp`，因此默认配置仍会重新编码图片。
 
 注册到系统，并设置为 macOS 开机自启动：
 
