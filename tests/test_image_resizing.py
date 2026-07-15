@@ -131,21 +131,44 @@ class ImageResizingTest(unittest.TestCase):
 
 
 class UploadResizePipelineTest(unittest.TestCase):
-    def test_upload_resizes_before_watermark_and_s3_upload(self):
-        source_image = Image.new("RGB", (4000, 2000), "white")
+    def make_source(self, source_format="PNG"):
+        return app.ClipboardImage(
+            image=Image.new("RGB", (4000, 2000), "white"),
+            raw_bytes=b"source-image",
+            source_format=source_format,
+        )
+
+    def make_payload(self, processing="encoded"):
+        return app.UploadPayload(
+            data=b"webp-payload",
+            filename="clipboard.webp",
+            content_type="image/webp",
+            processing=processing,
+        )
+
+    def test_upload_resizes_then_watermarks_then_prepares_and_uploads(self):
+        source = self.make_source()
         resized_image = Image.new("RGB", (1920, 960), "white")
         watermarked_image = Image.new("RGB", (1920, 960), "gray")
-        url = "https://example.test/clipboard.png"
+        payload = self.make_payload()
+        url = "https://example.test/clipboard.webp"
         pipeline = Mock()
         pipeline.resize.return_value = resized_image
         pipeline.watermark.return_value = watermarked_image
+        pipeline.prepare.return_value = payload
         pipeline.upload.return_value = url
 
         with (
-            patch.object(app, "MAX_IMAGE_DIMENSION", 1920),
-            patch.object(app, "get_clipboard_image", return_value=source_image),
+            patch.multiple(
+                app,
+                MAX_IMAGE_DIMENSION=1920,
+                WEBP_QUALITY=82,
+                WATERMARK_TEXT="PicUp",
+            ),
+            patch.object(app, "get_clipboard_image", return_value=source),
             patch.object(app, "resize_image_if_needed", pipeline.resize),
             patch.object(app, "add_watermark", pipeline.watermark),
+            patch.object(app, "prepare_upload_payload", pipeline.prepare),
             patch.object(app, "upload_to_s3", pipeline.upload),
             patch.object(app, "copy_to_clipboard") as copy_mock,
             patch.object(app, "show_notification") as notification_mock,
@@ -156,14 +179,90 @@ class UploadResizePipelineTest(unittest.TestCase):
         self.assertEqual({"success": True, "result": url}, response.get_json())
         self.assertEqual(
             [
-                call.resize(source_image, 1920),
+                call.resize(source.image, 1920),
                 call.watermark(resized_image),
-                call.upload(watermarked_image, "clipboard.png"),
+                call.prepare(source, watermarked_image, True, 82),
+                call.upload(payload),
             ],
             pipeline.mock_calls,
         )
         copy_mock.assert_called_once_with(url)
         notification_mock.assert_called_once()
+
+    def test_empty_watermark_and_no_resize_allow_passthrough_decision(self):
+        source = app.ClipboardImage(
+            image=Image.new("RGB", (1200, 800), "white"),
+            raw_bytes=b"source-webp",
+            source_format="WEBP",
+        )
+        payload = self.make_payload(processing="passthrough")
+        pipeline = Mock()
+        pipeline.resize.return_value = source.image
+        pipeline.prepare.return_value = payload
+        pipeline.upload.return_value = "https://example.test/clipboard.webp"
+
+        with (
+            patch.multiple(
+                app,
+                MAX_IMAGE_DIMENSION=1920,
+                WEBP_QUALITY=82,
+                WATERMARK_TEXT="",
+            ),
+            patch.object(app, "get_clipboard_image", return_value=source),
+            patch.object(app, "resize_image_if_needed", pipeline.resize),
+            patch.object(app, "add_watermark") as watermark_mock,
+            patch.object(app, "prepare_upload_payload", pipeline.prepare),
+            patch.object(app, "upload_to_s3", pipeline.upload),
+            patch.object(app, "copy_to_clipboard"),
+            patch.object(app, "show_notification"),
+        ):
+            response = app.app.test_client().post("/upload")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            [
+                call.resize(source.image, 1920),
+                call.prepare(source, source.image, False, 82),
+                call.upload(payload),
+            ],
+            pipeline.mock_calls,
+        )
+        watermark_mock.assert_not_called()
+
+    def test_encoding_failure_returns_500_without_uploading(self):
+        source = app.ClipboardImage(
+            image=Image.new("RGB", (1200, 800), "white"),
+            raw_bytes=b"source-png",
+            source_format="PNG",
+        )
+        with (
+            patch.multiple(
+                app,
+                MAX_IMAGE_DIMENSION=1920,
+                WEBP_QUALITY=82,
+                WATERMARK_TEXT="",
+            ),
+            patch.object(app, "get_clipboard_image", return_value=source),
+            patch.object(
+                app,
+                "resize_image_if_needed",
+                return_value=source.image,
+            ),
+            patch.object(
+                app,
+                "prepare_upload_payload",
+                side_effect=OSError("WebP encode failed"),
+            ),
+            patch.object(app, "upload_to_s3") as upload_mock,
+        ):
+            response = app.app.test_client().post("/upload")
+
+        self.assertEqual(500, response.status_code)
+        self.assertEqual(
+            {"success": False, "message": "WebP encode failed"},
+            response.get_json(),
+        )
+        upload_mock.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -381,32 +381,36 @@ def show_notification(title, message):
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    """上传剪贴板图片到 S3"""
+    """上传剪贴板图片到 S3。"""
     try:
-        # 获取剪贴板图片
-        image = get_clipboard_image()
-        if not image:
+        source = get_clipboard_image()
+        if not source:
             logger.warning("剪贴板中没有图片")
             return jsonify({'success': False, 'message': '剪贴板中没有图片'}), 400
-        
-        # 缩小超过尺寸限制的图片
-        resized_image = resize_image_if_needed(image, MAX_IMAGE_DIMENSION)
 
-        # 在最终上传尺寸上添加水印
-        watermarked_image = add_watermark(resized_image)
-        
-        # 上传到 S3
-        url = upload_to_s3(watermarked_image, 'clipboard.png')
+        resized_image = resize_image_if_needed(
+            source.image,
+            MAX_IMAGE_DIMENSION,
+        )
+        pixels_changed = resized_image is not source.image
+        processed_image = resized_image
+
+        if WATERMARK_TEXT:
+            processed_image = add_watermark(resized_image)
+            pixels_changed = True
+
+        payload = prepare_upload_payload(
+            source,
+            processed_image,
+            pixels_changed,
+            WEBP_QUALITY,
+        )
+        url = upload_to_s3(payload)
         if not url:
             return jsonify({'success': False, 'message': '上传到 S3 失败'}), 500
-        
-        # 复制 URL 到剪贴板
+
         copy_to_clipboard(url)
-        
-        # 显示通知
         show_notification('上传成功', f'图片已上传到 S3\nURL 已复制到剪贴板')
-        
-        # 返回 PicGo 兼容的响应格式
         return jsonify({'success': True, 'result': url})
     except Exception as e:
         logger.exception("上传过程中出错 | error=%s", e)
