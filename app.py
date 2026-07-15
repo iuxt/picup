@@ -20,10 +20,35 @@ logger = logging.getLogger("picup.app")
 
 app = Flask(__name__)
 
+
+def env_positive_int(name, default):
+    """Read a positive integer environment setting."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    try:
+        parsed_value = int(value)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{name} must be a positive integer, got {value!r}"
+        ) from exc
+
+    if parsed_value < 1:
+        raise RuntimeError(
+            f"{name} must be a positive integer, got {value!r}"
+        )
+
+    return parsed_value
+
+
 # S3 配置
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 S3_REGION = os.getenv('AWS_REGION')
 S3_ENDPOINT = os.getenv('S3_ENDPOINT_URL', None)
+
+# 图片尺寸配置
+MAX_IMAGE_DIMENSION = env_positive_int('MAX_IMAGE_DIMENSION', 1920)
 
 # 水印配置
 WATERMARK_TEXT = os.getenv('WATERMARK_TEXT', 'PicUp')

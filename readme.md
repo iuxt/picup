@@ -31,7 +31,10 @@ python3 -m venv .venv
 PICUP_HOST=127.0.0.1
 PICUP_PORT=36677
 PICUP_THREADS=4
+MAX_IMAGE_DIMENSION=1920
 ```
+
+`MAX_IMAGE_DIMENSION` 是上传图片允许的最长边像素数，默认 `1920`。超过限制的图片会等比例缩小，小图不会放大。
 
 注册到系统，并设置为 macOS 开机自启动：
 
