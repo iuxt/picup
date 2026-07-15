@@ -1,5 +1,8 @@
 import io
+import sys
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, call, patch
 
 from PIL import Image
 
@@ -69,6 +72,37 @@ class ClipboardImageDecodingTest(unittest.TestCase):
         self.assertEqual("JPEG", result.source_format)
         self.assertEqual((2, 3), result.image.size)
         self.assertNotIn(274, result.image.getexif())
+
+
+class ClipboardReaderFallbackTest(unittest.TestCase):
+    def test_invalid_webp_representation_falls_back_to_png(self):
+        png_bytes = image_bytes("PNG")
+        data_by_type = {
+            "org.webmproject.webp": b"not-a-webp",
+            "public.png": png_bytes,
+        }
+        item = Mock()
+        item.types.return_value = tuple(data_by_type)
+        item.dataForType_.side_effect = lambda data_type: SimpleNamespace(
+            bytes=lambda: memoryview(data_by_type[data_type])
+        )
+        pasteboard = Mock()
+        pasteboard.pasteboardItems.return_value = [item]
+        appkit = SimpleNamespace(
+            NSPasteboard=SimpleNamespace(
+                generalPasteboard=Mock(return_value=pasteboard)
+            )
+        )
+
+        with patch.dict(sys.modules, {"AppKit": appkit}):
+            result = app.get_clipboard_image()
+
+        self.assertEqual("PNG", result.source_format)
+        self.assertEqual(png_bytes, result.raw_bytes)
+        self.assertEqual(
+            [call("org.webmproject.webp"), call("public.png")],
+            item.dataForType_.call_args_list,
+        )
 
 
 if __name__ == "__main__":

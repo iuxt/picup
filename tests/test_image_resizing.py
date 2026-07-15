@@ -1,3 +1,4 @@
+import io
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -263,6 +264,57 @@ class UploadResizePipelineTest(unittest.TestCase):
             response.get_json(),
         )
         upload_mock.assert_not_called()
+
+
+class UploadRealPipelineTest(unittest.TestCase):
+    def make_source(self, image_format):
+        raw_bytes = io.BytesIO()
+        Image.new("RGBA", (16, 12), (10, 20, 30, 0)).save(
+            raw_bytes,
+            format=image_format,
+        )
+        return app.decode_clipboard_image(raw_bytes.getvalue())
+
+    def upload_and_capture(self, source):
+        url = "https://example.test/clipboard.webp"
+        with (
+            patch.multiple(
+                app,
+                MAX_IMAGE_DIMENSION=1920,
+                WEBP_QUALITY=82,
+                WATERMARK_TEXT="",
+            ),
+            patch.object(app, "get_clipboard_image", return_value=source),
+            patch.object(app, "upload_to_s3", return_value=url) as upload_mock,
+            patch.object(app, "copy_to_clipboard"),
+            patch.object(app, "show_notification"),
+        ):
+            response = app.app.test_client().post("/upload")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"success": True, "result": url}, response.get_json())
+        return upload_mock.call_args.args[0]
+
+    def test_png_runs_through_real_pipeline_and_becomes_webp(self):
+        source = self.make_source("PNG")
+
+        payload = self.upload_and_capture(source)
+
+        self.assertEqual("encoded", payload.processing)
+        self.assertEqual("clipboard.webp", payload.filename)
+        self.assertEqual("image/webp", payload.content_type)
+        self.assertNotEqual(source.raw_bytes, payload.data)
+        with Image.open(io.BytesIO(payload.data)) as uploaded:
+            self.assertEqual("WEBP", uploaded.format)
+            self.assertEqual(source.image.size, uploaded.size)
+
+    def test_unchanged_webp_runs_through_real_pipeline_byte_for_byte(self):
+        source = self.make_source("WEBP")
+
+        payload = self.upload_and_capture(source)
+
+        self.assertEqual("passthrough", payload.processing)
+        self.assertEqual(source.raw_bytes, payload.data)
 
 
 if __name__ == "__main__":

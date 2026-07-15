@@ -47,6 +47,23 @@ class WebPEncodingTest(unittest.TestCase):
             self.assertEqual("RGBA", result.mode)
             self.assertEqual(0, result.getpixel((0, 0))[3])
 
+    def test_real_output_preserves_icc_but_drops_exif_and_xmp(self):
+        source = Image.new("RGB", (4, 4), "navy")
+        source.info.update(
+            {
+                "icc_profile": b"test-icc-profile",
+                "exif": b"private-exif",
+                "xmp": b"private-xmp",
+            }
+        )
+
+        encoded = app.encode_webp(source, 82)
+
+        with Image.open(io.BytesIO(encoded)) as result:
+            self.assertEqual(b"test-icc-profile", result.info["icc_profile"])
+            self.assertNotIn("exif", result.info)
+            self.assertNotIn("xmp", result.info)
+
 
 class UploadPayloadDecisionTest(unittest.TestCase):
     def make_source(self, source_format="WEBP", raw_bytes=b"source-webp"):
