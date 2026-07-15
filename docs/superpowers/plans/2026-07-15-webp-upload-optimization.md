@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the small application in `app.py`, but separate clipboard decoding, pixel processing, WebP payload preparation, and S3 upload into focused helpers. Preserve the source bytes and detected format, track whether resizing or watermarking changed pixels, then either pass through unchanged WebP bytes or encode the processed Pillow image at configurable quality.
 
-**Tech Stack:** Python 3.9/3.12, Flask 3.1.3, Pillow 11.3.0 with WebP support, boto3, unittest, macOS AppKit clipboard APIs
+**Tech Stack:** Python 3.10+ (Python 3.12 recommended), Flask 3.1.3, Pillow 11.3.0 with WebP support, boto3, unittest, macOS AppKit clipboard APIs
 
 ## Global Constraints
 

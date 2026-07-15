@@ -10,7 +10,7 @@
 
 现在只支持macOS
 
-python 我用的是macOS自带的 3.9  或者使用 3.12 版本，3.9 aws 的库有个警告。
+请使用 Python 3.12（最低 3.10）。当前固定版本的 `pyobjc-core` 不支持 macOS 自带的 Python 3.9。
 
 安装依赖：
 
