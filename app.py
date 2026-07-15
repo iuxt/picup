@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import uuid
+from dataclasses import dataclass
 from flask import Flask, request, jsonify
 from PIL import Image, ImageDraw, ImageFont
 import boto3
@@ -80,43 +81,61 @@ WATERMARK_POSITION = os.getenv('WATERMARK_POSITION', 'bottom_right')
 WATERMARK_COLOR = os.getenv('WATERMARK_COLOR', '#FFFFFF')
 
 
+CLIPBOARD_IMAGE_TYPES = (
+    "org.webmproject.webp",
+    "public.webp",
+    "public.png",
+    "public.tiff",
+    "public.image",
+    "NSBitmapImageRep",
+)
+
+
+@dataclass(frozen=True)
+class ClipboardImage:
+    image: Image.Image
+    raw_bytes: bytes
+    source_format: str
+
+
+def decode_clipboard_image(raw_bytes):
+    """Decode clipboard bytes while retaining their original representation."""
+    with io.BytesIO(raw_bytes) as image_data:
+        image = Image.open(image_data)
+        source_format = (image.format or "").upper()
+        image.load()
+
+    return ClipboardImage(
+        image=image,
+        raw_bytes=raw_bytes,
+        source_format=source_format,
+    )
+
+
 def get_clipboard_image():
-    """获取剪贴板中的图片"""
+    """获取剪贴板中的图片及其原始字节和格式。"""
     try:
-        # 使用 pyobjc 库获取剪贴板图片
-        from AppKit import NSPasteboard, NSImage
-        import io
-        
-        # 获取系统剪贴板
+        from AppKit import NSPasteboard
+
         pasteboard = NSPasteboard.generalPasteboard()
-        
-        # 获取剪贴板项目
         items = pasteboard.pasteboardItems()
         if not items:
             return None
-        
-        # 遍历剪贴板项目
+
         for item in items:
-            # 获取项目的所有数据类型
             types = item.types()
-            
-            # 尝试多种图片数据类型
-            for data_type in ["public.png", "public.tiff", "public.image", "NSBitmapImageRep"]:
-                if data_type in types:
-                    try:
-                        # 获取数据
-                        data = item.dataForType_(data_type)
-                        if data:
-                            # 将 NSData 转换为字节流
-                            bytes_data = data.bytes()
-                            img_data = io.BytesIO(bytes_data)
-                            
-                            # 打开图片
-                            return Image.open(img_data)
-                    except Exception:
-                        continue
-        
-        # 如果没有找到图片数据
+            for data_type in CLIPBOARD_IMAGE_TYPES:
+                if data_type not in types:
+                    continue
+
+                try:
+                    data = item.dataForType_(data_type)
+                    if data:
+                        raw_bytes = bytes(data.bytes())
+                        return decode_clipboard_image(raw_bytes)
+                except Exception:
+                    continue
+
         return None
     except Exception as e:
         logger.exception("获取剪贴板图片失败 | error=%s", e)
