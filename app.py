@@ -283,8 +283,11 @@ def upload():
             logger.warning("剪贴板中没有图片")
             return jsonify({'success': False, 'message': '剪贴板中没有图片'}), 400
         
-        # 添加水印
-        watermarked_image = add_watermark(image)
+        # 缩小超过尺寸限制的图片
+        resized_image = resize_image_if_needed(image, MAX_IMAGE_DIMENSION)
+
+        # 在最终上传尺寸上添加水印
+        watermarked_image = add_watermark(resized_image)
         
         # 上传到 S3
         url = upload_to_s3(watermarked_image, 'clipboard.png')

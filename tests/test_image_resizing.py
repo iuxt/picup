@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 from PIL import Image
 
@@ -84,6 +84,42 @@ class ImageResizingTest(unittest.TestCase):
             "resized_size=1920x960 | max_dimension=1920",
             captured.output[0],
         )
+
+
+class UploadResizePipelineTest(unittest.TestCase):
+    def test_upload_resizes_before_watermark_and_s3_upload(self):
+        source_image = Image.new("RGB", (4000, 2000), "white")
+        resized_image = Image.new("RGB", (1920, 960), "white")
+        watermarked_image = Image.new("RGB", (1920, 960), "gray")
+        url = "https://example.test/clipboard.png"
+        pipeline = Mock()
+        pipeline.resize.return_value = resized_image
+        pipeline.watermark.return_value = watermarked_image
+        pipeline.upload.return_value = url
+
+        with (
+            patch.object(app, "MAX_IMAGE_DIMENSION", 1920),
+            patch.object(app, "get_clipboard_image", return_value=source_image),
+            patch.object(app, "resize_image_if_needed", pipeline.resize),
+            patch.object(app, "add_watermark", pipeline.watermark),
+            patch.object(app, "upload_to_s3", pipeline.upload),
+            patch.object(app, "copy_to_clipboard") as copy_mock,
+            patch.object(app, "show_notification") as notification_mock,
+        ):
+            response = app.app.test_client().post("/upload")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"success": True, "result": url}, response.get_json())
+        self.assertEqual(
+            [
+                call.resize(source_image, 1920),
+                call.watermark(resized_image),
+                call.upload(watermarked_image, "clipboard.png"),
+            ],
+            pipeline.mock_calls,
+        )
+        copy_mock.assert_called_once_with(url)
+        notification_mock.assert_called_once()
 
 
 if __name__ == "__main__":
