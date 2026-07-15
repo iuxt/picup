@@ -218,6 +218,69 @@ def add_watermark(image):
         return image
 
 
+@dataclass(frozen=True)
+class UploadPayload:
+    data: bytes
+    filename: str
+    content_type: str
+    processing: str
+
+
+def encode_webp(image, quality):
+    """Encode a Pillow image as lossy WebP with size-focused settings."""
+    output = io.BytesIO()
+    save_options = {
+        "format": "WEBP",
+        "quality": quality,
+        "method": 6,
+    }
+    icc_profile = image.info.get("icc_profile")
+    if icc_profile:
+        save_options["icc_profile"] = icc_profile
+
+    image.save(output, **save_options)
+    return output.getvalue()
+
+
+def prepare_upload_payload(
+    source,
+    processed_image,
+    pixels_changed,
+    quality,
+):
+    """Pass through unchanged WebP or encode the processed image as WebP."""
+    if source.source_format == "WEBP" and not pixels_changed:
+        data = source.raw_bytes
+        processing = "passthrough"
+    else:
+        data = encode_webp(processed_image, quality)
+        processing = "encoded"
+
+    input_bytes = len(source.raw_bytes)
+    output_bytes = len(data)
+    reduction_pct = (
+        (input_bytes - output_bytes) / input_bytes * 100
+        if input_bytes
+        else 0.0
+    )
+    logger.info(
+        "图片已准备 | source_format=%s | processing=%s | "
+        "input_bytes=%s | output_bytes=%s | reduction_pct=%.1f",
+        source.source_format or "UNKNOWN",
+        processing,
+        input_bytes,
+        output_bytes,
+        reduction_pct,
+    )
+
+    return UploadPayload(
+        data=data,
+        filename="clipboard.webp",
+        content_type="image/webp",
+        processing=processing,
+    )
+
+
 def upload_to_s3(image, filename):
     """上传图片到 S3"""
     unique_filename = None
