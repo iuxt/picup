@@ -42,6 +42,29 @@ def env_positive_int(name, default):
     return parsed_value
 
 
+def env_int_in_range(name, default, minimum, maximum):
+    """Read an integer environment setting constrained to an inclusive range."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    try:
+        parsed_value = int(value)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{name} must be an integer from {minimum} to {maximum}, "
+            f"got {value!r}"
+        ) from exc
+
+    if not minimum <= parsed_value <= maximum:
+        raise RuntimeError(
+            f"{name} must be an integer from {minimum} to {maximum}, "
+            f"got {value!r}"
+        )
+
+    return parsed_value
+
+
 # S3 配置
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 S3_REGION = os.getenv('AWS_REGION')
@@ -49,6 +72,7 @@ S3_ENDPOINT = os.getenv('S3_ENDPOINT_URL', None)
 
 # 图片尺寸配置
 MAX_IMAGE_DIMENSION = env_positive_int('MAX_IMAGE_DIMENSION', 1920)
+WEBP_QUALITY = env_int_in_range('WEBP_QUALITY', 82, 1, 100)
 
 # 水印配置
 WATERMARK_TEXT = os.getenv('WATERMARK_TEXT', 'PicUp')

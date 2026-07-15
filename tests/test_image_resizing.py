@@ -38,6 +38,50 @@ class ImageSizeConfigTest(unittest.TestCase):
                         app.env_positive_int("MAX_IMAGE_DIMENSION", 1920)
 
 
+class WebPQualityConfigTest(unittest.TestCase):
+    def test_missing_value_uses_default(self):
+        with patch.dict(app.os.environ, {}, clear=True):
+            result = app.env_int_in_range("WEBP_QUALITY", 82, 1, 100)
+
+        self.assertEqual(82, result)
+
+    def test_boundary_and_configured_values_are_used(self):
+        for value in ("1", "82", "100"):
+            with self.subTest(value=value):
+                with patch.dict(
+                    app.os.environ,
+                    {"WEBP_QUALITY": value},
+                    clear=True,
+                ):
+                    result = app.env_int_in_range(
+                        "WEBP_QUALITY",
+                        82,
+                        1,
+                        100,
+                    )
+
+                self.assertEqual(int(value), result)
+
+    def test_invalid_values_raise_configuration_error(self):
+        for value in ("", "not-a-number", "0", "-1", "101"):
+            with self.subTest(value=value):
+                with patch.dict(
+                    app.os.environ,
+                    {"WEBP_QUALITY": value},
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "WEBP_QUALITY must be an integer from 1 to 100",
+                    ):
+                        app.env_int_in_range(
+                            "WEBP_QUALITY",
+                            82,
+                            1,
+                            100,
+                        )
+
+
 class ImageResizingTest(unittest.TestCase):
     def test_landscape_image_is_resized_by_longest_edge(self):
         image = Image.new("RGB", (4000, 2000), "white")
